@@ -54,6 +54,12 @@ export const getRecommendations = (menuItemIds) =>
     body: JSON.stringify({ items: menuItemIds.map((menuItemId) => ({ menuItemId })) }),
   });
 
+export const getPaymentConfig = () => request("/payments/config");
+export const startCheckout = (token) =>
+  request("/payments/checkout", { method: "POST", body: JSON.stringify({ token }) });
+export const verifyPayment = (body) =>
+  request("/payments/verify", { method: "POST", body: JSON.stringify(body) });
+
 // Staff
 export const loginRequest = (email, password) =>
   request("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });

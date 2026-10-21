@@ -5,6 +5,7 @@ const { getIO } = require("../sockets");
 const createOrderSchema = z.object({
   tableNumber: z.number().int().positive(),
   notes: z.string().max(300).optional(),
+  paymentMethod: z.enum(["COUNTER", "ONLINE"]).default("COUNTER"),
   items: z
     .array(
       z.object({
@@ -29,7 +30,7 @@ exports.createOrder = async (req, res, next) => {
   try {
     const data = createOrderSchema.parse(req.body);
     const order = await orderService.createOrder(data);
-    getIO().to("kitchen").emit("order:new", order);
+    if (order.status === "NEW") getIO().to("kitchen").emit("order:new", order);
     res.status(201).json(order);
   } catch (err) {
     next(err);

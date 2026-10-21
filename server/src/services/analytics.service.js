@@ -20,7 +20,7 @@ function localParts(date) {
 // Sales = every order that was not cancelled
 function fetchSales(since) {
   return prisma.order.findMany({
-    where: { createdAt: { gte: since }, status: { not: "CANCELLED" } },
+    where: { createdAt: { gte: since }, status: { notIn: ["CANCELLED", "PENDING_PAYMENT"] } },
     select: { createdAt: true, totalPaise: true },
   });
 }
@@ -96,7 +96,10 @@ async function getTopItems(days) {
   const rows = await prisma.orderItem.groupBy({
     by: ["menuItemId", "nameSnapshot"],
     where: {
-      order: { createdAt: { gte: startOfLocalDay(days - 1) }, status: { not: "CANCELLED" } },
+      order: {
+        createdAt: { gte: startOfLocalDay(days - 1) },
+        status: { notIn: ["CANCELLED", "PENDING_PAYMENT"] },
+      },
     },
     _sum: { quantity: true },
     orderBy: { _sum: { quantity: "desc" } },

@@ -184,6 +184,17 @@ export default function KitchenBoard() {
                           </li>
                         ))}
                       </ul>
+                      <p className="mt-2">
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-xs font-semibold ${
+                            o.paymentStatus === "PAID"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-gray-200 text-gray-700"
+                          }`}
+                        >
+                          {o.paymentStatus === "PAID" ? "PAID ONLINE" : "PAY AT COUNTER"}
+                        </span>
+                      </p>
                       {o.notes && (
                         <p className="mt-2 rounded bg-yellow-100 p-2 text-sm">📝 {o.notes}</p>
                       )}

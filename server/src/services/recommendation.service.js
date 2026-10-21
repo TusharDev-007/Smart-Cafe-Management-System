@@ -47,7 +47,7 @@ async function recommend(cartItemIds) {
     by: ["menuItemId"],
     where: {
       menuItemId: { in: [...picked.keys()] },
-      order: { createdAt: { gte: since }, status: { not: "CANCELLED" } },
+      order: { createdAt: { gte: since }, status: { notIn: ["CANCELLED", "PENDING_PAYMENT"] } },
     },
     _sum: { quantity: true },
   });

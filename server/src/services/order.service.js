@@ -1,3 +1,4 @@
+const payments = require("./payment.service");
 const prisma = require("../lib/prisma");
 const AppError = require("../utils/AppError");
 
@@ -8,11 +9,16 @@ const ALLOWED = {
   READY: ["SERVED"],
   SERVED: [],
   CANCELLED: [],
+  PENDING_PAYMENT: [],
 };
 
 const orderInclude = { table: true, items: true };
 
-async function createOrder({ tableNumber, items, notes }) {
+async function createOrder({ tableNumber, items, notes, paymentMethod = "COUNTER" }) {
+  if (paymentMethod === "ONLINE" && !payments.isEnabled()) {
+    throw new AppError(503, "Online payments are not available right now");
+  }
+
   const table = await prisma.cafeTable.findUnique({ where: { number: tableNumber } });
   if (!table || !table.isActive) throw new AppError(404, "Table not found");
 
@@ -37,7 +43,15 @@ async function createOrder({ tableNumber, items, notes }) {
   });
 
   return prisma.order.create({
-    data: { tableId: table.id, totalPaise, notes, items: { create: orderItems } },
+    data: {
+      tableId: table.id,
+      totalPaise,
+      notes,
+      paymentMethod,
+      // Online orders wait for a verified payment before the kitchen sees them
+      status: paymentMethod === "ONLINE" ? "PENDING_PAYMENT" : "NEW",
+      items: { create: orderItems },
+    },
     include: orderInclude,
   });
 }

@@ -9,6 +9,7 @@ const analyticsRoutes = require("./routes/analytics.routes");
 const tableRoutes = require("./routes/table.routes");
 const recommendationRoutes = require("./routes/recommendation.routes");
 const adminMenuRoutes = require("./routes/menu.admin.routes");
+const paymentRoutes = require("./routes/payment.routes");
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use("/api/menu", menuRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/recommendations", recommendationRoutes);
 app.use("/api/admin/menu", adminMenuRoutes);
+app.use("/api/payments", paymentRoutes);
 
 app.use(errorHandler);
 app.use("/api/analytics", analyticsRoutes);

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { createOrder, getRecommendations } from "../../api/http";
+import { createOrder, getPaymentConfig, getRecommendations } from "../../api/http";
 import { useCart } from "../../context/CartContext";
+import { payForOrder } from "../../utils/payment";
 import { rupees } from "../../utils/money";
 
 export default function CartPage() {
@@ -11,6 +12,8 @@ export default function CartPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [suggestions, setSuggestions] = useState([]);
+  const [onlineEnabled, setOnlineEnabled] = useState(false);
+  const [method, setMethod] = useState("COUNTER");
 
   // Refetch suggestions only when the SET of items changes, not on quantity changes
   const idsKey = items
@@ -33,6 +36,19 @@ export default function CartPage() {
     };
   }, [idsKey]);
 
+  // Is online payment configured on the server?
+  useEffect(() => {
+    let cancelled = false;
+    getPaymentConfig()
+      .then((c) => {
+        if (!cancelled) setOnlineEnabled(c.enabled);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   if (!tableNumber)
     return <p className="p-4">Please scan your table's QR code to start ordering.</p>;
 
@@ -46,15 +62,27 @@ export default function CartPage() {
       </div>
     );
 
+  const paymentMethod = onlineEnabled ? method : "COUNTER";
+
   async function placeOrder() {
     setSubmitting(true);
     setError("");
     try {
       const order = await createOrder({
         tableNumber,
+        paymentMethod,
         notes: notes.trim() || undefined,
         items: items.map((i) => ({ menuItemId: i.menuItemId, quantity: i.quantity })),
       });
+
+      if (paymentMethod === "ONLINE") {
+        try {
+          await payForOrder(order.publicToken);
+        } catch {
+          // Cancelled or failed: the order is saved, and its status page offers "Pay now"
+        }
+      }
+
       clear();
       navigate(`/order/${order.publicToken}`, { replace: true });
     } catch (e) {
@@ -133,7 +161,34 @@ export default function CartPage() {
         rows={2}
       />
 
-      <p className="mt-3 text-sm text-gray-500">Payment: pay at the counter</p>
+      {onlineEnabled ? (
+        <fieldset className="mt-4">
+          <legend className="mb-1 text-sm font-semibold">Payment</legend>
+          {[
+            ["COUNTER", "Pay at the counter"],
+            ["ONLINE", "Pay online now (UPI / card)"],
+          ].map(([value, label]) => (
+            <label
+              key={value}
+              className={`mb-2 flex items-center gap-2 rounded-lg border p-3 ${
+                method === value ? "border-orange-600 bg-orange-50" : ""
+              }`}
+            >
+              <input
+                type="radio"
+                name="payment"
+                value={value}
+                checked={method === value}
+                onChange={() => setMethod(value)}
+              />
+              {label}
+            </label>
+          ))}
+        </fieldset>
+      ) : (
+        <p className="mt-3 text-sm text-gray-500">Payment: pay at the counter</p>
+      )}
+
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
 
       <div className="fixed inset-x-0 bottom-0 mx-auto max-w-md border-t bg-white p-4">
@@ -142,7 +197,13 @@ export default function CartPage() {
           disabled={submitting}
           className="flex w-full items-center justify-between rounded-lg bg-green-600 px-4 py-3 font-semibold text-white disabled:opacity-60"
         >
-          <span>{submitting ? "Placing order..." : "PLACE ORDER"}</span>
+          <span>
+            {submitting
+              ? "Please wait..."
+              : paymentMethod === "ONLINE"
+                ? "PAY & PLACE ORDER"
+                : "PLACE ORDER"}
+          </span>
           <span>{rupees(totalPaise)}</span>
         </button>
       </div>
