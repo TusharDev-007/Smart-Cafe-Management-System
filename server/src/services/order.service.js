@@ -68,5 +68,12 @@ async function getById(id) {
   if (!order) throw new AppError(404, "Order not found");
   return order;
 }
-
-module.exports = { createOrder, updateStatus, listActive, getById };
+async function getByToken(token) {
+  const order = await prisma.order.findUnique({
+    where: { publicToken: token },
+    include: orderInclude,
+  });
+  if (!order) throw new AppError(404, "Order not found");
+  return order;
+}
+module.exports = { createOrder, updateStatus, listActive, getById, getByToken };

@@ -82,6 +82,7 @@ model MenuItem {
 model Order {
   id            Int           @id @default(autoincrement())
   tableId       Int
+  publicToken   String        @unique @default(uuid())
   status        OrderStatus   @default(NEW)
   paymentStatus PaymentStatus @default(PENDING)
   paymentMethod PaymentMethod @default(COUNTER)

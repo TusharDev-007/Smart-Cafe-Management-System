@@ -44,7 +44,7 @@ async function request(path, options = {}) {
 
 // Customer
 export const getMenu = () => request("/menu");
-export const getOrder = (id) => request(`/orders/${id}`);
+export const trackOrder = (token) => request(`/orders/track/${token}`);
 export const createOrder = (body) =>
   request("/orders", { method: "POST", body: JSON.stringify(body) });
 

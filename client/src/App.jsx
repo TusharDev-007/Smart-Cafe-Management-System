@@ -25,7 +25,7 @@ export default function App() {
       <Route path="/" element={<Home />} />
       <Route path="/table/:number" element={<MenuPage />} />
       <Route path="/cart" element={<CartPage />} />
-      <Route path="/order/:id" element={<OrderStatusPage />} />
+      <Route path="/order/:token" element={<OrderStatusPage />} />
 
       <Route path="/kitchen/login" element={<KitchenLogin />} />
       <Route

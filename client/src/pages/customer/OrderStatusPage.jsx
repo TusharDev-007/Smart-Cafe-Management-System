@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { getOrder } from "../../api/http";
+import { trackOrder } from "../../api/http";
 import { socket } from "../../api/socket";
 import { rupees } from "../../utils/money";
 
@@ -13,24 +13,23 @@ const LABELS = {
 };
 
 export default function OrderStatusPage() {
-  const { id } = useParams();
-  const orderId = Number(id);
+  const { token } = useParams();
   const [order, setOrder] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     const load = () =>
-      getOrder(orderId)
+      trackOrder(token)
         .then(setOrder)
-        .catch((e) => setError(e.message));
+        .catch(() => setError("We couldn't find this order. Please ask the staff for help."));
 
-    // Join this order's room, and reload so nothing is missed after a reconnect
+    // Join this order's private room, and reload so nothing is missed after a reconnect
     const join = () => {
-      socket.emit("join:order", orderId);
+      socket.emit("join:order", token);
       load();
     };
     const onUpdated = (o) => {
-      if (o.id === orderId) setOrder(o);
+      if (o.publicToken === token) setOrder(o);
     };
 
     if (socket.connected) join();
@@ -41,7 +40,7 @@ export default function OrderStatusPage() {
       socket.off("connect", join);
       socket.off("order:updated", onUpdated);
     };
-  }, [orderId]);
+  }, [token]);
 
   if (error) return <p className="p-4 text-red-600">{error}</p>;
   if (!order) return <p className="p-4">Loading...</p>;

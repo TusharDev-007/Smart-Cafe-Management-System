@@ -23,6 +23,8 @@ const statusSchema = z.object({
 
 const idSchema = z.coerce.number().int().positive();
 
+const tokenSchema = z.string().regex(/^[A-Za-z0-9-]{16,64}$/);
+
 exports.createOrder = async (req, res, next) => {
   try {
     const data = createOrderSchema.parse(req.body);
@@ -39,7 +41,7 @@ exports.updateStatus = async (req, res, next) => {
     const id = idSchema.parse(req.params.id);
     const { status } = statusSchema.parse(req.body);
     const order = await orderService.updateStatus(id, status);
-    getIO().to("kitchen").to(`order:${id}`).emit("order:updated", order);
+    getIO().to("kitchen").to(`order:${order.publicToken}`).emit("order:updated", order);
     res.json(order);
   } catch (err) {
     next(err);
@@ -58,6 +60,15 @@ exports.getOrder = async (req, res, next) => {
   try {
     const id = idSchema.parse(req.params.id);
     res.json(await orderService.getById(id));
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.trackOrder = async (req, res, next) => {
+  try {
+    const token = tokenSchema.parse(req.params.token);
+    res.json(await orderService.getByToken(token));
   } catch (err) {
     next(err);
   }

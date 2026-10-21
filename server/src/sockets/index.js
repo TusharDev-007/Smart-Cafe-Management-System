@@ -2,6 +2,8 @@ const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
 const env = require("../config/env");
 
+const TOKEN_PATTERN = /^[A-Za-z0-9-]{16,64}$/;
+
 let io;
 
 function initSocket(httpServer, clientUrl) {
@@ -33,10 +35,11 @@ function initSocket(httpServer, clientUrl) {
       }
     });
 
-    // A customer's phone joins the room of its own order
-    socket.on("join:order", (orderId) => {
-      const id = Number(orderId);
-      if (Number.isInteger(id) && id > 0) socket.join(`order:${id}`);
+    // A customer's phone joins the private room of its own order, by token
+    socket.on("join:order", (token) => {
+      if (typeof token === "string" && TOKEN_PATTERN.test(token)) {
+        socket.join(`order:${token}`);
+      }
     });
   });
 

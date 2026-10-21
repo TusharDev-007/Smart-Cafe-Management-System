@@ -56,7 +56,7 @@ export default function CartPage() {
         items: items.map((i) => ({ menuItemId: i.menuItemId, quantity: i.quantity })),
       });
       clear();
-      navigate(`/order/${order.id}`, { replace: true });
+      navigate(`/order/${order.publicToken}`, { replace: true });
     } catch (e) {
       setError(e.message);
       setSubmitting(false);
