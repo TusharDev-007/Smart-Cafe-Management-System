@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Secrets and local config (keep .env.example, it has no secrets)
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+build/
+
+# Logs
+*.log
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

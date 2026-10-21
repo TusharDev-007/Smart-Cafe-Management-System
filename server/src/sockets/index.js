@@ -1,0 +1,51 @@
+const { Server } = require("socket.io");
+const jwt = require("jsonwebtoken");
+const env = require("../config/env");
+
+let io;
+
+function initSocket(httpServer, clientUrl) {
+  io = new Server(httpServer, { cors: { origin: clientUrl } });
+
+  // Customers connect without a token; staff connect with one.
+  io.use((socket, next) => {
+    const token = socket.handshake.auth?.token;
+    socket.data.user = null;
+    if (token) {
+      try {
+        socket.data.user = jwt.verify(token, env.JWT_SECRET, { algorithms: ["HS256"] });
+      } catch {
+        // invalid or expired token: treated as an anonymous customer
+      }
+    }
+    next();
+  });
+
+  io.on("connection", (socket) => {
+    // Only logged-in staff may receive the kitchen feed
+    socket.on("join:kitchen", (ack) => {
+      const role = socket.data.user?.role;
+      if (role === "KITCHEN" || role === "ADMIN") {
+        socket.join("kitchen");
+        if (typeof ack === "function") ack({ ok: true });
+      } else if (typeof ack === "function") {
+        ack({ ok: false, error: "Unauthorized" });
+      }
+    });
+
+    // A customer's phone joins the room of its own order
+    socket.on("join:order", (orderId) => {
+      const id = Number(orderId);
+      if (Number.isInteger(id) && id > 0) socket.join(`order:${id}`);
+    });
+  });
+
+  return io;
+}
+
+function getIO() {
+  if (!io) throw new Error("Socket.IO is not initialised");
+  return io;
+}
+
+module.exports = { initSocket, getIO };
