@@ -32,8 +32,11 @@ exports.verify = async (req, res, next) => {
       razorpayPaymentId: body.razorpay_payment_id,
       signature: body.razorpay_signature,
     });
-    // Only now does the kitchen hear about an online order
-    if (justPaid) getIO().to("kitchen").emit("order:new", order);
+    if (justPaid) {
+      const io = getIO();
+      io.to("kitchen").emit("order:new", order); // now the kitchen sees it
+      io.to(`order:${order.publicToken}`).emit("order:updated", order); // and the customer's other screens
+    }
     res.json(order);
   } catch (err) {
     next(err);

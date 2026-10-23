@@ -83,6 +83,7 @@ async function main() {
   const staff = [
     { name: "Cafe Admin", email: "admin@cafe.local", password: "Admin@123", role: "ADMIN" },
     { name: "Kitchen Staff", email: "kitchen@cafe.local", password: "Kitchen@123", role: "KITCHEN" },
+    { name: "Cashier", email: "cashier@cafe.local", password: "Cashier@123", role: "CASHIER" },
   ];
   for (const s of staff) {
     const passwordHash = await bcrypt.hash(s.password, 10);

@@ -23,17 +23,20 @@ function initSocket(httpServer, clientUrl) {
     next();
   });
 
+  // Lets a staff member join a room only if their role is allowed
+  function joinIfAllowed(socket, room, roles, ack) {
+    const role = socket.data.user?.role;
+    if (roles.includes(role)) {
+      socket.join(room);
+      if (typeof ack === "function") ack({ ok: true });
+    } else if (typeof ack === "function") {
+      ack({ ok: false, error: "Unauthorized" });
+    }
+  }
+
   io.on("connection", (socket) => {
-    // Only logged-in staff may receive the kitchen feed
-    socket.on("join:kitchen", (ack) => {
-      const role = socket.data.user?.role;
-      if (role === "KITCHEN" || role === "ADMIN") {
-        socket.join("kitchen");
-        if (typeof ack === "function") ack({ ok: true });
-      } else if (typeof ack === "function") {
-        ack({ ok: false, error: "Unauthorized" });
-      }
-    });
+    socket.on("join:kitchen", (ack) => joinIfAllowed(socket, "kitchen", ["KITCHEN", "ADMIN"], ack));
+    socket.on("join:cashier", (ack) => joinIfAllowed(socket, "cashier", ["CASHIER", "ADMIN"], ack));
 
     // A customer's phone joins the private room of its own order, by token
     socket.on("join:order", (token) => {

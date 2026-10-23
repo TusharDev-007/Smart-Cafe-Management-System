@@ -3,6 +3,8 @@ import { Link, useParams } from "react-router-dom";
 import { getMenu } from "../../api/http";
 import { useCart } from "../../context/CartContext";
 import { rupees } from "../../utils/money";
+import ReadyBanner from "../../components/ReadyBanner";
+import YourOrders from "../../components/YourOrders";
 
 function VegMark({ isVeg }) {
   return (
@@ -42,12 +44,16 @@ export default function MenuPage() {
 
   return (
     <div className="mx-auto max-w-md pb-24">
-      <header className="sticky top-0 z-10 bg-orange-600 px-4 py-3 text-white">
+      <div className="sticky top-0 z-10">
+      <header className="bg-orange-600 px-4 py-3 text-white">
         <h1 className="text-lg font-bold">Café Menu</h1>
         <p className="text-sm opacity-90">Table {tableNumber}</p>
-      </header>
+            </header>
+      <ReadyBanner />
+      </div>
 
       <div className="px-4">
+      <YourOrders />
         {menu.map((cat) => (
           <section key={cat.id} className="mt-5">
             <h2 className="mb-2 text-lg font-semibold text-orange-600">{cat.name}</h2>

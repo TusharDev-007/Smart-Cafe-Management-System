@@ -130,6 +130,12 @@ export default function KitchenBoard() {
     setSoundOn(!soundOn);
   }
 
+  // How many open orders each table currently has on the board
+  const openByTable = orders.reduce((acc, o) => {
+    acc[o.table.number] = (acc[o.table.number] || 0) + 1;
+    return acc;
+  }, {});
+
   return (
     <div className="min-h-screen bg-gray-100">
       <header className="flex flex-wrap items-center justify-between gap-2 bg-gray-900 px-4 py-3 text-white">
@@ -184,16 +190,15 @@ export default function KitchenBoard() {
                           </li>
                         ))}
                       </ul>
-                      <p className="mt-2">
-                        <span
-                          className={`rounded px-1.5 py-0.5 text-xs font-semibold ${
-                            o.paymentStatus === "PAID"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-gray-200 text-gray-700"
-                          }`}
-                        >
-                          {o.paymentStatus === "PAID" ? "PAID ONLINE" : "PAY AT COUNTER"}
+                      <p className="mt-2 flex flex-wrap gap-1">
+                        <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs font-semibold text-green-800">
+                          {o.paymentMethod === "ONLINE" ? "PAID ONLINE" : "PAID AT COUNTER"}
                         </span>
+                        {openByTable[o.table.number] > 1 && (
+                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">
+                            Table {o.table.number} · {openByTable[o.table.number]} open orders
+                          </span>
+                        )}
                       </p>
                       {o.notes && (
                         <p className="mt-2 rounded bg-yellow-100 p-2 text-sm">📝 {o.notes}</p>

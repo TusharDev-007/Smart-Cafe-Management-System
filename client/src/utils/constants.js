@@ -1,0 +1,1 @@
+export const UNPAID_EXPIRY_MINUTES = 15; // keep in sync with the server (order.service.js)

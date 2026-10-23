@@ -4,6 +4,10 @@ import { trackOrder } from "../../api/http";
 import { socket } from "../../api/socket";
 import { PAYMENT_CANCELLED, payForOrder } from "../../utils/payment";
 import { rupees } from "../../utils/money";
+import { UNPAID_EXPIRY_MINUTES } from "../../utils/constants";
+import ReadyBanner from "../../components/ReadyBanner";
+import YourOrders from "../../components/YourOrders";
+import { useMyOrders } from "../../context/MyOrdersContext";
 
 const STEPS = ["NEW", "PREPARING", "READY", "SERVED"];
 const LABELS = {
@@ -14,6 +18,7 @@ const LABELS = {
 };
 
 export default function OrderStatusPage() {
+  const { addOrder } = useMyOrders();
   const { token } = useParams();
   const [order, setOrder] = useState(null);
   const [error, setError] = useState("");
@@ -21,9 +26,12 @@ export default function OrderStatusPage() {
   const [payError, setPayError] = useState("");
 
   useEffect(() => {
-    const load = () =>
+      const load = () =>
       trackOrder(token)
-        .then(setOrder)
+        .then((o) => {
+          setOrder(o);
+          addOrder(o); // remember it on this device for the "Your orders" list
+        })
         .catch(() => setError("We couldn't find this order. Please ask the staff for help."));
 
     // Join this order's private room, and reload so nothing is missed after a reconnect
@@ -64,20 +72,39 @@ export default function OrderStatusPage() {
   const awaitingPayment = order.status === "PENDING_PAYMENT";
   const currentStep = STEPS.indexOf(order.status);
 
-  let paymentLine = "Pay at the counter";
-  if (order.paymentMethod === "ONLINE") {
-    paymentLine = order.paymentStatus === "PAID" ? "Paid online ✓" : "Online payment pending";
+  let paymentLine;
+  if (order.paymentStatus === "PAID") {
+    paymentLine = order.paymentMethod === "ONLINE" ? "Paid online ✓" : "Paid at the counter ✓";
+  } else if (order.paymentMethod === "ONLINE") {
+    paymentLine = "Online payment pending";
+  } else {
+    paymentLine = "Pay at the counter";
   }
 
   return (
     <div className="mx-auto max-w-md p-4">
+      <div className="sticky top-0 z-20 -mx-4 -mt-4 mb-3">
+        <ReadyBanner excludeToken={token} />
+      </div>
       <h1 className="text-xl font-bold">Order #{order.id}</h1>
       <p className="text-sm text-gray-500">Table {order.table.number}</p>
 
       {cancelled ? (
         <p className="mt-4 rounded-lg bg-red-50 p-3 font-semibold text-red-700">
-          This order was cancelled. Please speak to the staff.
+          This order was cancelled. If it was not paid in time, please place a new order, or speak to the staff.
         </p>
+      ) : awaitingPayment && order.paymentMethod === "COUNTER" ? (
+        <div className="mt-4 rounded-lg bg-amber-50 p-4 text-center">
+          <p className="text-sm text-amber-800">
+            Please pay at the counter and tell the cashier your order number
+          </p>
+          <p className="my-2 text-4xl font-extrabold text-amber-900">#{order.id}</p>
+          <p className="text-lg font-semibold">{rupees(order.totalPaise)}</p>
+          <p className="mt-2 text-sm text-amber-700">
+            Your order goes to the kitchen once the cashier confirms your payment. Unpaid orders are
+            cancelled after {UNPAID_EXPIRY_MINUTES} minutes.
+          </p>
+        </div>
       ) : awaitingPayment ? (
         <div className="mt-4 rounded-lg bg-amber-50 p-3">
           <p className="font-semibold text-amber-800">Payment pending</p>
@@ -133,6 +160,7 @@ export default function OrderStatusPage() {
         to={`/table/${order.table.number}`}
         className="mt-6 block rounded-lg border border-orange-600 py-2 text-center font-semibold text-orange-600"
       >
+        <YourOrders minOrders={2} />
         Order more
       </Link>
     </div>

@@ -23,14 +23,14 @@ const statusSchema = z.object({
 });
 
 const idSchema = z.coerce.number().int().positive();
-
 const tokenSchema = z.string().regex(/^[A-Za-z0-9-]{16,64}$/);
 
 exports.createOrder = async (req, res, next) => {
   try {
     const data = createOrderSchema.parse(req.body);
     const order = await orderService.createOrder(data);
-    if (order.status === "NEW") getIO().to("kitchen").emit("order:new", order);
+    // The kitchen hears about an order only after it is paid. Counter orders go to the cashier first.
+    if (order.paymentMethod === "COUNTER") getIO().to("cashier").emit("order:pending", order);
     res.status(201).json(order);
   } catch (err) {
     next(err);
@@ -70,6 +70,40 @@ exports.trackOrder = async (req, res, next) => {
   try {
     const token = tokenSchema.parse(req.params.token);
     res.json(await orderService.getByToken(token));
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ---- Cashier ----
+
+exports.listPendingPayment = async (req, res, next) => {
+  try {
+    res.json(await orderService.listPendingCounter());
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.confirmPayment = async (req, res, next) => {
+  try {
+    const id = idSchema.parse(req.params.id);
+    const order = await orderService.confirmCounterPayment(id);
+    const io = getIO();
+    io.to("kitchen").emit("order:new", order); // now the kitchen sees it
+    io.to("cashier").to(`order:${order.publicToken}`).emit("order:updated", order);
+    res.json(order);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.rejectOrder = async (req, res, next) => {
+  try {
+    const id = idSchema.parse(req.params.id);
+    const order = await orderService.rejectUnpaid(id);
+    getIO().to("cashier").to(`order:${order.publicToken}`).emit("order:updated", order);
+    res.json(order);
   } catch (err) {
     next(err);
   }

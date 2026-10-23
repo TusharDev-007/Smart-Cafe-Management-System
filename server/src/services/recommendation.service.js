@@ -4,7 +4,7 @@ const rules = require("../config/recommendationRules");
 const MAX_SUGGESTIONS = 3;
 const norm = (s) => s.trim().toLowerCase();
 
-// Does the cart match a selector like { items: [...], categories: [...] }?
+// Does a set of names/categories match a selector like { items: [...], categories: [...] }?
 function matches(selector, names, categories) {
   if (!selector) return false;
   return (
@@ -13,29 +13,43 @@ function matches(selector, names, categories) {
   );
 }
 
-async function recommend(cartItemIds) {
+const namesOf = (list) => new Set(list.map((i) => norm(i.name)));
+const categoriesOf = (list) => new Set(list.map((i) => norm(i.category.name)));
+
+// cartItemIds: what is in the cart now. earlierItemIds: items from this table's earlier orders.
+async function recommend(cartItemIds, earlierItemIds = []) {
   const ids = [...new Set(cartItemIds)];
   if (ids.length === 0) return [];
+  const earlierIds = [...new Set(earlierItemIds)].filter((id) => !ids.includes(id));
 
-  const [cartItems, menu] = await Promise.all([
+  const [cartItems, earlierItems, menu] = await Promise.all([
     prisma.menuItem.findMany({ where: { id: { in: ids } }, include: { category: true } }),
+    earlierIds.length
+      ? prisma.menuItem.findMany({ where: { id: { in: earlierIds } }, include: { category: true } })
+      : [],
     prisma.menuItem.findMany({ where: { isAvailable: true }, include: { category: true } }),
   ]);
 
-  const cartNames = new Set(cartItems.map((i) => norm(i.name)));
-  const cartCategories = new Set(cartItems.map((i) => norm(i.category.name)));
-  const inCart = new Set(ids);
+  // Only the cart can TRIGGER a rule. Earlier orders can only BLOCK a suggestion.
+  const cartNames = namesOf(cartItems);
+  const cartCategories = categoriesOf(cartItems);
+
+  const seen = [...cartItems, ...earlierItems];
+  const seenNames = namesOf(seen);
+  const seenCategories = categoriesOf(seen);
+  const seenIds = new Set([...ids, ...earlierIds]);
+
   const menuByName = new Map(menu.map((m) => [norm(m.name), m]));
 
   // Collect candidates. The first rule to suggest an item wins.
   const picked = new Map(); // menuItemId -> { item, reason, priority }
   rules.forEach((rule, priority) => {
     if (!matches(rule.when, cartNames, cartCategories)) return;
-    if (matches(rule.unless, cartNames, cartCategories)) return;
+    if (matches(rule.unless, seenNames, seenCategories)) return;
 
     for (const name of rule.suggest) {
       const item = menuByName.get(norm(name));
-      if (!item || inCart.has(item.id) || picked.has(item.id)) continue;
+      if (!item || seenIds.has(item.id) || picked.has(item.id)) continue;
       picked.set(item.id, { item, reason: rule.message, priority });
     }
   });

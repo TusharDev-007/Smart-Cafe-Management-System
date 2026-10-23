@@ -48,10 +48,13 @@ export const trackOrder = (token) => request(`/orders/track/${token}`);
 export const createOrder = (body) =>
   request("/orders", { method: "POST", body: JSON.stringify(body) });
 
-export const getRecommendations = (menuItemIds) =>
+export const getRecommendations = (menuItemIds, earlierItemIds = []) =>
   request("/recommendations", {
     method: "POST",
-    body: JSON.stringify({ items: menuItemIds.map((menuItemId) => ({ menuItemId })) }),
+    body: JSON.stringify({
+      items: menuItemIds.map((menuItemId) => ({ menuItemId })),
+      earlierItems: earlierItemIds.map((menuItemId) => ({ menuItemId })),
+    }),
   });
 
 export const getPaymentConfig = () => request("/payments/config");
@@ -86,3 +89,8 @@ export const updateCategory = (id, body) =>
   request(`/admin/menu/categories/${id}`, { method: "PATCH", body: JSON.stringify(body) });
 export const deleteCategory = (id) =>
   request(`/admin/menu/categories/${id}`, { method: "DELETE" });
+
+export const getPendingPayments = () => request("/orders/pending-payment");
+export const confirmCounterPayment = (id) =>
+  request(`/orders/${id}/confirm-payment`, { method: "POST" });
+export const rejectOrder = (id) => request(`/orders/${id}/reject`, { method: "POST" });

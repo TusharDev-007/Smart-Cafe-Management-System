@@ -1,16 +1,22 @@
-const payments = require("./payment.service");
 const prisma = require("../lib/prisma");
 const AppError = require("../utils/AppError");
+const payments = require("./payment.service");
 
-// Which status changes are legal
+// Status changes the kitchen may make. Unpaid orders are not theirs to move:
+// only a verified online payment or the cashier can release them.
 const ALLOWED = {
+  PENDING_PAYMENT: [],
   NEW: ["PREPARING", "CANCELLED"],
   PREPARING: ["READY", "CANCELLED"],
   READY: ["SERVED"],
   SERVED: [],
   CANCELLED: [],
-  PENDING_PAYMENT: [],
 };
+
+const UNPAID_EXPIRY_MINUTES = 15; // keep in sync with client/src/utils/constants.js
+const UNPAID_EXPIRY_MS = UNPAID_EXPIRY_MINUTES * 60 * 1000;
+const MAX_ORDER_PAISE = 500000; // Rs 5,000
+const MAX_UNPAID_PER_TABLE = 3;
 
 const orderInclude = { table: true, items: true };
 
@@ -42,14 +48,33 @@ async function createOrder({ tableNumber, items, notes, paymentMethod = "COUNTER
     };
   });
 
+  if (totalPaise > MAX_ORDER_PAISE) {
+    throw new AppError(
+      400,
+      `Orders above ₹${MAX_ORDER_PAISE / 100} need help from the staff. Please speak to the cashier.`
+    );
+  }
+
+  // Stop one table from flooding the cashier with unpaid orders
+  const waiting = await prisma.order.count({
+    where: {
+      tableId: table.id,
+      status: "PENDING_PAYMENT",
+      createdAt: { gte: new Date(Date.now() - UNPAID_EXPIRY_MS) },
+    },
+  });
+  if (waiting >= MAX_UNPAID_PER_TABLE) {
+    throw new AppError(429, "This table already has orders waiting for payment. Please pay for them first.");
+  }
+
+  // Every order starts unpaid: online orders wait for Razorpay, counter orders wait for the cashier
   return prisma.order.create({
     data: {
       tableId: table.id,
       totalPaise,
       notes,
       paymentMethod,
-      // Online orders wait for a verified payment before the kitchen sees them
-      status: paymentMethod === "ONLINE" ? "PENDING_PAYMENT" : "NEW",
+      status: "PENDING_PAYMENT",
       items: { create: orderItems },
     },
     include: orderInclude,
@@ -82,6 +107,7 @@ async function getById(id) {
   if (!order) throw new AppError(404, "Order not found");
   return order;
 }
+
 async function getByToken(token) {
   const order = await prisma.order.findUnique({
     where: { publicToken: token },
@@ -90,4 +116,83 @@ async function getByToken(token) {
   if (!order) throw new AppError(404, "Order not found");
   return order;
 }
-module.exports = { createOrder, updateStatus, listActive, getById, getByToken };
+
+// ---- Cashier ----
+
+// Counter orders still waiting for the customer to pay
+function listPendingCounter() {
+  return prisma.order.findMany({
+    where: {
+      status: "PENDING_PAYMENT",
+      paymentMethod: "COUNTER",
+      createdAt: { gte: new Date(Date.now() - UNPAID_EXPIRY_MS) },
+    },
+    include: orderInclude,
+    orderBy: { createdAt: "asc" },
+  });
+}
+
+// The cashier has received the money: release this order to the kitchen
+async function confirmCounterPayment(id) {
+  const order = await prisma.order.findUnique({ where: { id } });
+  if (!order) throw new AppError(404, "Order not found");
+  if (order.paymentMethod !== "COUNTER") throw new AppError(409, "This order is paid online");
+  if (order.status === "CANCELLED") {
+    throw new AppError(409, "This order was cancelled or expired. Ask the customer to order again.");
+  }
+
+  // Atomic: guards against two cashiers (or the expiry job) acting at the same moment
+  const { count } = await prisma.order.updateMany({
+    where: { id, status: "PENDING_PAYMENT", paymentMethod: "COUNTER" },
+    data: { status: "NEW", paymentStatus: "PAID" },
+  });
+  if (count === 0) throw new AppError(409, "This order was already confirmed");
+  return getById(id);
+}
+
+// Fake or abandoned order: cancel it before any food is made
+async function rejectUnpaid(id) {
+  const order = await prisma.order.findUnique({ where: { id } });
+  if (!order) throw new AppError(404, "Order not found");
+
+  const { count } = await prisma.order.updateMany({
+    where: { id, status: "PENDING_PAYMENT", paymentMethod: "COUNTER" },
+    data: { status: "CANCELLED" },
+  });
+  if (count === 0) throw new AppError(409, "This order is no longer waiting for payment");
+  return getById(id);
+}
+
+// Cancels counter orders that were not paid in time. Returns the orders it cancelled.
+async function expireUnpaidCounterOrders() {
+  const stale = await prisma.order.findMany({
+    where: {
+      status: "PENDING_PAYMENT",
+      paymentMethod: "COUNTER",
+      createdAt: { lt: new Date(Date.now() - UNPAID_EXPIRY_MS) },
+    },
+    select: { id: true },
+  });
+
+  const expired = [];
+  for (const { id } of stale) {
+    const { count } = await prisma.order.updateMany({
+      where: { id, status: "PENDING_PAYMENT" },
+      data: { status: "CANCELLED" },
+    });
+    if (count === 1) expired.push(await getById(id));
+  }
+  return expired;
+}
+
+module.exports = {
+  createOrder,
+  updateStatus,
+  listActive,
+  getById,
+  getByToken,
+  listPendingCounter,
+  confirmCounterPayment,
+  rejectUnpaid,
+  expireUnpaidCounterOrders,
+};

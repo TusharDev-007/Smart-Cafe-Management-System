@@ -20,6 +20,12 @@ export default function AdminHeader() {
           </NavLink>
             Table QR codes
           </NavLink>
+          <NavLink to="/cashier" className={linkClass}>
+            Cashier
+          </NavLink>
+          <NavLink to="/kitchen" className={linkClass}>
+            Kitchen
+          </NavLink>
         </nav>
       </div>
       <div className="flex items-center gap-3 text-sm">

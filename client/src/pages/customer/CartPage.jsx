@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createOrder, getPaymentConfig, getRecommendations } from "../../api/http";
+import ReadyBanner from "../../components/ReadyBanner";
+import YourOrders from "../../components/YourOrders";
 import { useCart } from "../../context/CartContext";
+import { useMyOrders } from "../../context/MyOrdersContext";
 import { payForOrder } from "../../utils/payment";
 import { rupees } from "../../utils/money";
 
 export default function CartPage() {
   const { tableNumber, items, add, decrease, totalPaise, clear } = useCart();
+  const { addOrder, visitItemIds } = useMyOrders();
   const navigate = useNavigate();
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -21,10 +25,14 @@ export default function CartPage() {
     .sort((a, b) => a - b)
     .join(",");
 
+  // Items already ordered at this table during this visit
+  const earlierKey = visitItemIds(tableNumber).join(",");
+
   useEffect(() => {
     if (!idsKey) return;
     let cancelled = false;
-    getRecommendations(idsKey.split(",").map(Number))
+    const earlier = earlierKey ? earlierKey.split(",").map(Number) : [];
+    getRecommendations(idsKey.split(",").map(Number), earlier)
       .then((r) => {
         if (!cancelled) setSuggestions(r);
       })
@@ -34,7 +42,7 @@ export default function CartPage() {
     return () => {
       cancelled = true;
     };
-  }, [idsKey]);
+  }, [idsKey, earlierKey]);
 
   // Is online payment configured on the server?
   useEffect(() => {
@@ -74,6 +82,7 @@ export default function CartPage() {
         notes: notes.trim() || undefined,
         items: items.map((i) => ({ menuItemId: i.menuItemId, quantity: i.quantity })),
       });
+      addOrder(order); // remember it on this device for the "Your orders" list
 
       if (paymentMethod === "ONLINE") {
         try {
@@ -93,6 +102,10 @@ export default function CartPage() {
 
   return (
     <div className="mx-auto max-w-md p-4 pb-28">
+      <div className="sticky top-0 z-20 -mx-4 -mt-4 mb-3">
+        <ReadyBanner />
+      </div>
+
       <Link to={`/table/${tableNumber}`} className="text-sm font-semibold text-orange-600">
         ← Back to menu
       </Link>
@@ -125,6 +138,8 @@ export default function CartPage() {
           </div>
         ))}
       </div>
+
+      <YourOrders />
 
       {suggestions.length > 0 && (
         <section className="mt-5 rounded-lg bg-orange-50 p-3">
@@ -165,7 +180,7 @@ export default function CartPage() {
         <fieldset className="mt-4">
           <legend className="mb-1 text-sm font-semibold">Payment</legend>
           {[
-            ["COUNTER", "Pay at the counter"],
+            ["COUNTER", "Pay at the counter (your order starts once the cashier confirms)"],
             ["ONLINE", "Pay online now (UPI / card)"],
           ].map(([value, label]) => (
             <label
@@ -186,7 +201,9 @@ export default function CartPage() {
           ))}
         </fieldset>
       ) : (
-        <p className="mt-3 text-sm text-gray-500">Payment: pay at the counter</p>
+        <p className="mt-3 text-sm text-gray-500">
+          Payment: pay at the counter first. Your order starts once the cashier confirms.
+        </p>
       )}
 
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
