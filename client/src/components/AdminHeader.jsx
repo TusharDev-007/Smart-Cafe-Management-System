@@ -14,11 +14,14 @@ export default function AdminHeader() {
           <NavLink to="/admin" end className={linkClass}>
             Dashboard
           </NavLink>
-          <NavLink to="/admin/tables" className={linkClass}>
           <NavLink to="/admin/menu" className={linkClass}>
             Menu
           </NavLink>
+          <NavLink to="/admin/tables" className={linkClass}>
             Table QR codes
+          </NavLink>
+          <NavLink to="/admin/staff" className={linkClass}>
+            Staff
           </NavLink>
           <NavLink to="/cashier" className={linkClass}>
             Cashier

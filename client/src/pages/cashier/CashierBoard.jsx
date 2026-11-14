@@ -192,6 +192,9 @@ export default function CashierBoard() {
                     <div key={o.id} className="rounded-lg border p-3">
                       <div className="flex items-center justify-between">
                         <span className="text-2xl font-extrabold">#{o.id}</span>
+                        {o.isPacking && (
+  <span className="ml-2 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-bold text-orange-700">🛍️ Packing</span>
+)}
                         <span
                           className={`text-sm ${
                             mins >= UNPAID_EXPIRY_MINUTES - 5 ? "font-bold text-red-600" : "text-gray-500"

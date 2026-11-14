@@ -18,6 +18,7 @@ export default function CartPage() {
   const [suggestions, setSuggestions] = useState([]);
   const [onlineEnabled, setOnlineEnabled] = useState(false);
   const [method, setMethod] = useState("COUNTER");
+  const [isPacking, setIsPacking] = useState(false);
 
   // Refetch suggestions only when the SET of items changes, not on quantity changes
   const idsKey = items
@@ -81,6 +82,7 @@ export default function CartPage() {
         paymentMethod,
         notes: notes.trim() || undefined,
         items: items.map((i) => ({ menuItemId: i.menuItemId, quantity: i.quantity })),
+        isPacking
       });
       addOrder(order); // remember it on this device for the "Your orders" list
 
@@ -175,6 +177,18 @@ export default function CartPage() {
         className="mt-4 w-full rounded-lg border p-2 text-sm"
         rows={2}
       />
+      <div className="mb-4">
+  <p className="mb-2 text-sm font-semibold text-slate-700">How would you like your order?</p>
+  <div className="grid grid-cols-2 gap-2">
+    {[{ v: false, label: "Dine-in", icon: "🍽️" }, { v: true, label: "Packing (take-away)", icon: "🛍️" }].map(o => (
+      <button key={o.label} type="button" onClick={() => setIsPacking(o.v)}
+        className={`rounded-xl border-2 px-3 py-3 text-sm font-medium transition ${
+          isPacking === o.v ? "border-orange-500 bg-orange-50 text-orange-700" : "border-slate-200 bg-white text-slate-600"}`}>
+        <span className="mr-1">{o.icon}</span>{o.label}
+      </button>
+    ))}
+  </div>
+</div>
 
       {onlineEnabled ? (
         <fieldset className="mt-4">

@@ -19,8 +19,10 @@ exports.login = async (req, res, next) => {
     const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
 
     const ok = await bcrypt.compare(password, user ? user.passwordHash : DUMMY_HASH);
-    if (!user || !ok) throw new AppError(401, "Invalid email or password");
 
+    if (!user || !user.isActive || !ok) {
+      throw new AppError(401, "Invalid email or password");
+   }
     const token = jwt.sign({ role: user.role, name: user.name }, env.JWT_SECRET, {
       subject: String(user.id),
       expiresIn: env.JWT_EXPIRES_IN,

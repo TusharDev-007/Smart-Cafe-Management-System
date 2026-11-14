@@ -6,6 +6,7 @@ const createOrderSchema = z.object({
   tableNumber: z.number().int().positive(),
   notes: z.string().max(300).optional(),
   paymentMethod: z.enum(["COUNTER", "ONLINE"]).default("COUNTER"),
+  isPacking: z.boolean().optional().default(false),
   items: z
     .array(
       z.object({

@@ -1,3 +1,4 @@
+require("dotenv").config();
 const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcryptjs");
 
@@ -80,11 +81,43 @@ async function main() {
   }
 
   // Staff accounts (development passwords only)
-  const staff = [
-    { name: "Cafe Admin", email: "admin@cafe.local", password: "Admin@123", role: "ADMIN" },
-    { name: "Kitchen Staff", email: "kitchen@cafe.local", password: "Kitchen@123", role: "KITCHEN" },
-    { name: "Cashier", email: "cashier@cafe.local", password: "Cashier@123", role: "CASHIER" },
-  ];
+ // Staff accounts: passwords are supplied through environment variables
+const staff = [
+  {
+    name: "Cafe Admin",
+    email: "admin@cafe.local",
+    password: process.env.SEED_ADMIN_PASSWORD,
+    role: "ADMIN",
+  },
+  {
+    name: "Kitchen Staff",
+    email: "kitchen@cafe.local",
+    password: process.env.SEED_KITCHEN_PASSWORD,
+    role: "KITCHEN",
+  },
+  {
+    name: "Cashier",
+    email: "cashier@cafe.local",
+    password: process.env.SEED_CASHIER_PASSWORD,
+    role: "CASHIER",
+  },
+];
+
+if (process.env.NODE_ENV === "production") {
+  const missingPasswords = staff
+    .filter((s) => !s.password)
+    .map((s) => {
+      if (s.role === "ADMIN") return "SEED_ADMIN_PASSWORD";
+      if (s.role === "KITCHEN") return "SEED_KITCHEN_PASSWORD";
+      return "SEED_CASHIER_PASSWORD";
+    });
+
+  if (missingPasswords.length) {
+    throw new Error(
+      `Missing production seed passwords: ${missingPasswords.join(", ")}`
+    );
+  }
+}
   for (const s of staff) {
     const passwordHash = await bcrypt.hash(s.password, 10);
     await prisma.user.upsert({
@@ -94,7 +127,7 @@ async function main() {
     });
   }
 
-  console.log("Seed complete: 10 tables, menu, admin and kitchen users.");
+  console.log("Seed complete: 10 tables, menu, admin, kitchen and cashier users.");
 }
 
 main()

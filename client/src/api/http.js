@@ -94,3 +94,18 @@ export const getPendingPayments = () => request("/orders/pending-payment");
 export const confirmCounterPayment = (id) =>
   request(`/orders/${id}/confirm-payment`, { method: "POST" });
 export const rejectOrder = (id) => request(`/orders/${id}/reject`, { method: "POST" });
+
+// Staff Management (Admin)
+export const getStaff = () => request("/staff");
+
+export const createStaff = (body) =>
+  request("/staff", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export const updateStaff = (id, body) =>
+  request(`/staff/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });

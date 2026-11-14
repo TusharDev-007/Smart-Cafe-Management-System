@@ -20,7 +20,7 @@ const MAX_UNPAID_PER_TABLE = 3;
 
 const orderInclude = { table: true, items: true };
 
-async function createOrder({ tableNumber, items, notes, paymentMethod = "COUNTER" }) {
+async function createOrder({ tableNumber, items, notes, paymentMethod = "COUNTER", isPacking = false }) {
   if (paymentMethod === "ONLINE" && !payments.isEnabled()) {
     throw new AppError(503, "Online payments are not available right now");
   }
@@ -73,6 +73,7 @@ async function createOrder({ tableNumber, items, notes, paymentMethod = "COUNTER
       tableId: table.id,
       totalPaise,
       notes,
+      isPacking: Boolean(isPacking),
       paymentMethod,
       status: "PENDING_PAYMENT",
       items: { create: orderItems },

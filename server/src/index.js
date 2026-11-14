@@ -5,7 +5,7 @@ const { initSocket } = require("./sockets");
 const { startExpiryJob } = require("./jobs/expireUnpaid");
 
 const server = http.createServer(app);
-initSocket(server, env.CLIENT_URL);
+initSocket(server, env.CLIENT_ORIGIN);
 
 server.listen(env.PORT, () => {
   console.log(`Server running on http://localhost:${env.PORT}`);

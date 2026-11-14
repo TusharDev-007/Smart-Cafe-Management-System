@@ -169,7 +169,15 @@ export default function KitchenBoard() {
                 {list.map((o) => {
                   const mins = minutesSince(o.createdAt, now);
                   return (
-                    <div key={o.id} className="rounded-lg bg-white p-3 shadow">
+                    <div
+                      key={o.id}
+                      className={`rounded-xl bg-white p-3 shadow ${o.isPacking ? "ring-4 ring-orange-500" : ""}`}
+    >
+                      {o.isPacking && (
+                        <div className="mb-2 rounded-lg bg-orange-500 px-3 py-1.5 text-center text-sm font-extrabold tracking-wide text-white">
+                          🛍️ PACK THIS ORDER
+                        </div>
+                      )}
                       <div className="flex items-center justify-between">
                         <span className="text-lg font-bold">#{o.id}</span>
                         <span className="font-semibold">Table {o.table.number}</span>

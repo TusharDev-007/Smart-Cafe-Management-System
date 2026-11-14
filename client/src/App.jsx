@@ -9,6 +9,7 @@ import AdminLogin from "./pages/admin/AdminLogin";
 import Dashboard from "./pages/admin/Dashboard";
 import TableQRCodes from "./pages/admin/TableQRCodes";
 import MenuManager from "./pages/admin/MenuManager";
+import StaffManager from "./pages/admin/StaffManager";
 import CashierLogin from "./pages/cashier/CashierLogin";
 import CashierBoard from "./pages/cashier/CashierBoard";
 
@@ -63,7 +64,15 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-            <Route path="/cashier/login" element={<CashierLogin />} />
+        <Route
+        path="/admin/staff"
+        element={
+          <ProtectedRoute roles={["ADMIN"]} loginPath="/admin/login">
+            <StaffManager />
+          </ProtectedRoute>
+        }
+      />
+        <Route path="/cashier/login" element={<CashierLogin />} />
       <Route
         path="/cashier"
         element={

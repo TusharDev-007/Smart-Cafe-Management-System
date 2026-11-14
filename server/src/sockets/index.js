@@ -6,8 +6,20 @@ const TOKEN_PATTERN = /^[A-Za-z0-9-]{16,64}$/;
 
 let io;
 
-function initSocket(httpServer, clientUrl) {
-  io = new Server(httpServer, { cors: { origin: clientUrl } });
+function initSocket(httpServer, clientOrigins) {
+  const allowedOrigins = (Array.isArray(clientOrigins)
+    ? clientOrigins
+    : (clientOrigins || "").split(",")
+  )
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  io = new Server(httpServer, {
+    cors: {
+      origin: allowedOrigins.length ? allowedOrigins : false,
+      credentials: true,
+    },
+  });
 
   // Customers connect without a token; staff connect with one.
   io.use((socket, next) => {
