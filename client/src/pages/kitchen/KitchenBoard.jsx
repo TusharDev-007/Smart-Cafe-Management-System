@@ -130,11 +130,11 @@ export default function KitchenBoard() {
     setSoundOn(!soundOn);
   }
 
-  // How many open orders each table currently has on the board
-  const openByTable = orders.reduce((acc, o) => {
-    acc[o.table.number] = (acc[o.table.number] || 0) + 1;
-    return acc;
-  }, {});
+const nameKey = (o) => (o.customerName || "").trim().toLowerCase();
+const openByName = orders.reduce((acc, o) => {
+  acc[nameKey(o)] = (acc[nameKey(o)] || 0) + 1;
+  return acc;
+}, {});
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -180,7 +180,7 @@ export default function KitchenBoard() {
                       )}
                       <div className="flex items-center justify-between">
                         <span className="text-lg font-bold">#{o.id}</span>
-                        <span className="font-semibold">Table {o.table.number}</span>
+                        <span className="max-w-[45%] truncate text-lg font-bold">{o.customerName}</span>
                         <span
                           className={`text-sm ${
                             mins >= 15 && o.status !== "READY"
@@ -202,11 +202,11 @@ export default function KitchenBoard() {
                         <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs font-semibold text-green-800">
                           {o.paymentMethod === "ONLINE" ? "PAID ONLINE" : "PAID AT COUNTER"}
                         </span>
-                        {openByTable[o.table.number] > 1 && (
-                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">
-                            Table {o.table.number} · {openByTable[o.table.number]} open orders
-                          </span>
-                        )}
+                        {openByName[nameKey(o)] > 1 && (
+  <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">
+    {o.customerName} · {openByName[nameKey(o)]} open orders
+  </span>
+)}
                       </p>
                       {o.notes && (
                         <p className="mt-2 rounded bg-yellow-100 p-2 text-sm">📝 {o.notes}</p>

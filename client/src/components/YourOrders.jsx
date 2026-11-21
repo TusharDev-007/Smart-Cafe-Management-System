@@ -33,7 +33,7 @@ export default function YourOrders({ minOrders = 1 }) {
 
   return (
     <section className="mt-4 rounded-lg border bg-white p-3">
-      <h2 className="mb-2 font-semibold">Your orders · Table {tableNumber}</h2>
+      <h2 className="mb-2 font-semibold">Your orders</h2>
 
       {toPayTotal > 0 && (
         <p className="mb-2 rounded bg-amber-50 p-2 text-sm text-amber-900">

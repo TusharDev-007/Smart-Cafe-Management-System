@@ -9,6 +9,9 @@ import { rupees } from "../../utils/money";
 const minutesSince = (iso, now) =>
   Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60000));
 
+// Same person = same name, ignoring capitals and extra spaces
+const nameKey = (o) => (o.customerName || "").trim().toLowerCase();
+
 export default function CashierBoard() {
   const { user, logout } = useAuth();
   const [orders, setOrders] = useState([]);
@@ -89,10 +92,10 @@ export default function CashierBoard() {
     }
   }
 
-  async function confirmTable(group) {
+  async function confirmCustomer(group) {
     const total = group.reduce((s, o) => s + o.totalPaise, 0);
-    const tableNo = group[0].table.number;
-    if (!window.confirm(`Confirm payment of ${rupees(total)} for Table ${tableNo} (${group.length} orders)?`))
+    const name = group[0].customerName;
+    if (!window.confirm(`Confirm payment of ${rupees(total)} from ${name} (${group.length} orders)?`))
       return;
     setBusy(true);
     setError("");
@@ -107,7 +110,7 @@ export default function CashierBoard() {
   }
 
   async function reject(order) {
-    if (!window.confirm(`Reject order #${order.id} from Table ${order.table.number}?`)) return;
+    if (!window.confirm(`Reject order #${order.id} from ${order.customerName}?`)) return;
     setBusy(true);
     setError("");
     try {
@@ -120,10 +123,10 @@ export default function CashierBoard() {
     }
   }
 
-  // Group the waiting orders by table, oldest first
+  // Group the waiting orders by customer name, oldest first
   const groups = Object.values(
     orders.reduce((acc, o) => {
-      (acc[o.table.number] ||= []).push(o);
+      (acc[nameKey(o)] ||= []).push(o);
       return acc;
     }, {})
   ).sort((a, b) => new Date(a[0].createdAt) - new Date(b[0].createdAt));
@@ -163,12 +166,12 @@ export default function CashierBoard() {
         )}
 
         {groups.map((group) => {
-          const tableNo = group[0].table.number;
+          const name = group[0].customerName;
           const total = group.reduce((s, o) => s + o.totalPaise, 0);
           return (
-            <section key={tableNo} className="rounded-lg bg-white p-4 shadow">
+            <section key={nameKey(group[0])} className="rounded-lg bg-white p-4 shadow">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-xl font-bold">Table {tableNo}</h2>
+                <h2 className="text-xl font-bold">{name}</h2>
                 <div className="flex items-center gap-3">
                   <span className="font-semibold">
                     {group.length} {group.length === 1 ? "order" : "orders"} · {rupees(total)}
@@ -176,7 +179,7 @@ export default function CashierBoard() {
                   {group.length > 1 && (
                     <button
                       disabled={busy}
-                      onClick={() => confirmTable(group)}
+                      onClick={() => confirmCustomer(group)}
                       className="rounded-lg bg-green-700 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
                     >
                       Confirm all
@@ -193,8 +196,10 @@ export default function CashierBoard() {
                       <div className="flex items-center justify-between">
                         <span className="text-2xl font-extrabold">#{o.id}</span>
                         {o.isPacking && (
-  <span className="ml-2 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-bold text-orange-700">🛍️ Packing</span>
-)}
+                          <span className="ml-2 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-bold text-orange-700">
+                            🛍️ Packing
+                          </span>
+                        )}
                         <span
                           className={`text-sm ${
                             mins >= UNPAID_EXPIRY_MINUTES - 5 ? "font-bold text-red-600" : "text-gray-500"

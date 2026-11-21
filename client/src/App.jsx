@@ -13,19 +13,12 @@ import StaffManager from "./pages/admin/StaffManager";
 import CashierLogin from "./pages/cashier/CashierLogin";
 import CashierBoard from "./pages/cashier/CashierBoard";
 
-function Home() {
-  return (
-    <div className="mx-auto max-w-md p-6 text-center">
-      <h1 className="text-2xl font-bold">Welcome to the Café</h1>
-      <p className="mt-2 text-gray-600">Please scan the QR code on your table to order.</p>
-    </div>
-  );
-}
+
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Home />} />
+      <Route path="/" element={<MenuPage />} />
       <Route path="/table/:number" element={<MenuPage />} />
       <Route path="/cart" element={<CartPage />} />
       <Route path="/order/:token" element={<OrderStatusPage />} />

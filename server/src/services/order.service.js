@@ -16,11 +16,11 @@ const ALLOWED = {
 const UNPAID_EXPIRY_MINUTES = 15; // keep in sync with client/src/utils/constants.js
 const UNPAID_EXPIRY_MS = UNPAID_EXPIRY_MINUTES * 60 * 1000;
 const MAX_ORDER_PAISE = 500000; // Rs 5,000
-const MAX_UNPAID_PER_TABLE = 3;
+const MAX_UNPAID_PER_CUSTOMER = 3;
 
 const orderInclude = { table: true, items: true };
 
-async function createOrder({ tableNumber, items, notes, paymentMethod = "COUNTER", isPacking = false }) {
+async function createOrder({ tableNumber = 1, customerName, items, notes, paymentMethod = "COUNTER", isPacking = false }) {
   if (paymentMethod === "ONLINE" && !payments.isEnabled()) {
     throw new AppError(503, "Online payments are not available right now");
   }
@@ -56,21 +56,23 @@ async function createOrder({ tableNumber, items, notes, paymentMethod = "COUNTER
   }
 
   // Stop one table from flooding the cashier with unpaid orders
+    // Stop one person from flooding the cashier with unpaid orders (double taps, repeats)
   const waiting = await prisma.order.count({
     where: {
-      tableId: table.id,
+      customerName,
       status: "PENDING_PAYMENT",
       createdAt: { gte: new Date(Date.now() - UNPAID_EXPIRY_MS) },
     },
   });
-  if (waiting >= MAX_UNPAID_PER_TABLE) {
-    throw new AppError(429, "This table already has orders waiting for payment. Please pay for them first.");
+  if (waiting >= MAX_UNPAID_PER_CUSTOMER) {
+    throw new AppError(429, "You already have orders waiting for payment. Please pay for them first.");
   }
 
   // Every order starts unpaid: online orders wait for Razorpay, counter orders wait for the cashier
   return prisma.order.create({
     data: {
       tableId: table.id,
+      customerName,
       totalPaise,
       notes,
       isPacking: Boolean(isPacking),

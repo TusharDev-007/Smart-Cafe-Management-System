@@ -6,11 +6,14 @@ const STORAGE_KEY = "cafe-cart";
 function loadInitial() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const saved = JSON.parse(raw);
+      return { tableNumber: 1, items: Array.isArray(saved.items) ? saved.items : [] };
+    }
   } catch {
     // storage unavailable or corrupted: start with an empty cart
   }
-  return { tableNumber: null, items: [] };
+  return { tableNumber: 1, items: [] };
 }
 
 export function CartProvider({ children }) {

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { getMenu } from "../../api/http";
 import { useCart } from "../../context/CartContext";
+import { CAFE_NAME } from "../../utils/constants";
 import { rupees } from "../../utils/money";
 import ReadyBanner from "../../components/ReadyBanner";
 import YourOrders from "../../components/YourOrders";
@@ -122,10 +123,6 @@ function ItemRow({ item, qty, add, decrease, categoryName }) {
 }
 
 export default function MenuPage() {
-  const { number } = useParams();
-  const tableNumber = Number(number);
-  const validTable = Number.isInteger(tableNumber) && tableNumber > 0;
-
   const { setTable, items, add, decrease, count, totalPaise } = useCart();
   const [menu, setMenu] = useState(null);
   const [error, setError] = useState("");
@@ -134,9 +131,10 @@ export default function MenuPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const catId = Number(searchParams.get("cat")) || null;
 
+  // One shared QR code: every order uses the single hidden table 1
   useEffect(() => {
-    if (validTable) setTable(tableNumber);
-  }, [validTable, tableNumber, setTable]);
+    setTable(1);
+  }, [setTable]);
 
   useEffect(() => {
     getMenu().then(setMenu).catch((e) => setError(e.message));
@@ -163,8 +161,6 @@ export default function MenuPage() {
     );
   }, [categories, q]);
 
-  if (!validTable)
-    return <p className="p-4 text-red-600">Invalid table link. Please scan the QR code again.</p>;
   if (error) return <p className="p-4 text-red-600">{error}</p>;
   if (!menu) return <p className="p-4">Loading menu...</p>;
 
@@ -184,8 +180,8 @@ export default function MenuPage() {
     <div className="mx-auto max-w-md pb-24">
       <div className="sticky top-0 z-10 bg-white shadow-sm">
         <header className="bg-orange-600 px-4 py-3 text-white">
-          <h1 className="text-lg font-bold">Jugnu Grill Flame</h1>
-          <p className="text-sm opacity-90">Table {tableNumber}</p>
+          <h1 className="text-lg font-bold">{CAFE_NAME}</h1>
+          <p className="text-sm opacity-90">Order here, we'll call your name</p>
         </header>
         <ReadyBanner />
         <div className="relative px-4 py-2">

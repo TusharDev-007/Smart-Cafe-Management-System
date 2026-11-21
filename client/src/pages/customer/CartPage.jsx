@@ -8,10 +8,21 @@ import { useMyOrders } from "../../context/MyOrdersContext";
 import { payForOrder } from "../../utils/payment";
 import { rupees } from "../../utils/money";
 
+const NAME_KEY = "cafe-customer-name";
+
+function loadName() {
+  try {
+    return localStorage.getItem(NAME_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
 export default function CartPage() {
   const { tableNumber, items, add, decrease, totalPaise, clear } = useCart();
   const { addOrder, visitItemIds } = useMyOrders();
   const navigate = useNavigate();
+  const [customerName, setCustomerName] = useState(loadName);
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -20,13 +31,15 @@ export default function CartPage() {
   const [method, setMethod] = useState("COUNTER");
   const [isPacking, setIsPacking] = useState(false);
 
+  const nameOk = customerName.trim().length >= 2;
+
   // Refetch suggestions only when the SET of items changes, not on quantity changes
   const idsKey = items
     .map((i) => i.menuItemId)
     .sort((a, b) => a - b)
     .join(",");
 
-  // Items already ordered at this table during this visit
+  // Items already ordered during this visit
   const earlierKey = visitItemIds(tableNumber).join(",");
 
   useEffect(() => {
@@ -58,14 +71,11 @@ export default function CartPage() {
     };
   }, []);
 
-  if (!tableNumber)
-    return <p className="p-4">Please scan your table's QR code to start ordering.</p>;
-
   if (items.length === 0)
     return (
       <div className="mx-auto max-w-md p-4">
         <p className="mb-3">Your cart is empty.</p>
-        <Link to={`/table/${tableNumber}`} className="font-semibold text-orange-600">
+        <Link to="/" className="font-semibold text-orange-600">
           Back to menu
         </Link>
       </div>
@@ -74,16 +84,26 @@ export default function CartPage() {
   const paymentMethod = onlineEnabled ? method : "COUNTER";
 
   async function placeOrder() {
+    const name = customerName.trim().replace(/\s+/g, " ");
+    if (name.length < 2) {
+      setError("Please enter your name so we can call you when your order is ready.");
+      return;
+    }
     setSubmitting(true);
     setError("");
     try {
       const order = await createOrder({
-        tableNumber,
+        customerName: name,
         paymentMethod,
         notes: notes.trim() || undefined,
         items: items.map((i) => ({ menuItemId: i.menuItemId, quantity: i.quantity })),
-        isPacking
+        isPacking,
       });
+      try {
+        localStorage.setItem(NAME_KEY, name); // remember it for the next order on this phone
+      } catch {
+        // storage unavailable
+      }
       addOrder(order); // remember it on this device for the "Your orders" list
 
       if (paymentMethod === "ONLINE") {
@@ -108,10 +128,10 @@ export default function CartPage() {
         <ReadyBanner />
       </div>
 
-      <Link to={`/table/${tableNumber}`} className="text-sm font-semibold text-orange-600">
+      <Link to="/" className="text-sm font-semibold text-orange-600">
         ← Back to menu
       </Link>
-      <h1 className="mt-2 text-xl font-bold">Your order · Table {tableNumber}</h1>
+      <h1 className="mt-2 text-xl font-bold">Your order</h1>
 
       <div className="mt-3">
         {items.map((i) => (
@@ -169,6 +189,25 @@ export default function CartPage() {
         </section>
       )}
 
+      <div className="mt-4">
+        <label htmlFor="customer-name" className="mb-1 block text-sm font-semibold text-slate-700">
+          Your name <span className="text-red-600">*</span>
+        </label>
+        <input
+          id="customer-name"
+          type="text"
+          value={customerName}
+          onChange={(e) => setCustomerName(e.target.value)}
+          maxLength={30}
+          autoComplete="given-name"
+          placeholder="Enter your name"
+          className={`w-full rounded-lg border p-2 text-sm ${
+            customerName && !nameOk ? "border-red-400" : ""
+          }`}
+        />
+        <p className="mt-1 text-xs text-gray-500">We call this name when your order is ready.</p>
+      </div>
+
       <textarea
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
@@ -178,17 +217,28 @@ export default function CartPage() {
         rows={2}
       />
       <div className="mb-4">
-  <p className="mb-2 text-sm font-semibold text-slate-700">How would you like your order?</p>
-  <div className="grid grid-cols-2 gap-2">
-    {[{ v: false, label: "Dine-in", icon: "🍽️" }, { v: true, label: "Packing (take-away)", icon: "🛍️" }].map(o => (
-      <button key={o.label} type="button" onClick={() => setIsPacking(o.v)}
-        className={`rounded-xl border-2 px-3 py-3 text-sm font-medium transition ${
-          isPacking === o.v ? "border-orange-500 bg-orange-50 text-orange-700" : "border-slate-200 bg-white text-slate-600"}`}>
-        <span className="mr-1">{o.icon}</span>{o.label}
-      </button>
-    ))}
-  </div>
-</div>
+        <p className="mb-2 text-sm font-semibold text-slate-700">How would you like your order?</p>
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            { v: false, label: "Dine-in", icon: "🍽️" },
+            { v: true, label: "Packing (take-away)", icon: "🛍️" },
+          ].map((o) => (
+            <button
+              key={o.label}
+              type="button"
+              onClick={() => setIsPacking(o.v)}
+              className={`rounded-xl border-2 px-3 py-3 text-sm font-medium transition ${
+                isPacking === o.v
+                  ? "border-orange-500 bg-orange-50 text-orange-700"
+                  : "border-slate-200 bg-white text-slate-600"
+              }`}
+            >
+              <span className="mr-1">{o.icon}</span>
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {onlineEnabled ? (
         <fieldset className="mt-4">
@@ -223,9 +273,12 @@ export default function CartPage() {
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
 
       <div className="fixed inset-x-0 bottom-0 mx-auto max-w-md border-t bg-white p-4">
+        {!nameOk && (
+          <p className="mb-2 text-center text-xs text-red-600">Enter your name to place the order</p>
+        )}
         <button
           onClick={placeOrder}
-          disabled={submitting}
+          disabled={submitting || !nameOk}
           className="flex w-full items-center justify-between rounded-lg bg-green-600 px-4 py-3 font-semibold text-white disabled:opacity-60"
         >
           <span>

@@ -3,7 +3,13 @@ const orderService = require("../services/order.service");
 const { getIO } = require("../sockets");
 
 const createOrderSchema = z.object({
-  tableNumber: z.number().int().positive(),
+  tableNumber: z.number().int().positive().default(1),
+  customerName: z
+    .string()
+    .trim()
+    .min(2, "Please enter your name (at least 2 letters)")
+    .max(30, "Name is too long (30 characters at most)")
+    .regex(/^[\p{L}\p{N} .'_-]+$/u, "Use only letters, numbers and spaces in your name"),
   notes: z.string().max(300).optional(),
   paymentMethod: z.enum(["COUNTER", "ONLINE"]).default("COUNTER"),
   isPacking: z.boolean().optional().default(false),

@@ -91,6 +91,7 @@ model Order {
   paymentMethod PaymentMethod @default(COUNTER)
   totalPaise    Int
   notes         String?
+  customerName  String        @default("Guest")
   table         CafeTable     @relation(fields: [tableId], references: [id])
   items         OrderItem[]
   createdAt     DateTime      @default(now())

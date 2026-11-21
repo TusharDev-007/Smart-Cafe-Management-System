@@ -87,7 +87,7 @@ export default function OrderStatusPage() {
         <ReadyBanner excludeToken={token} />
       </div>
       <h1 className="text-xl font-bold">Order #{order.id}</h1>
-      <p className="text-sm text-gray-500">Table {order.table.number}</p>
+      <p className="text-sm text-gray-500">For {order.customerName}</p>
 
       {cancelled ? (
         <p className="mt-4 rounded-lg bg-red-50 p-3 font-semibold text-red-700">
@@ -156,13 +156,13 @@ export default function OrderStatusPage() {
         <p className="mt-1 text-sm text-gray-500">{paymentLine}</p>
       </div>
 
-      <Link
-        to={`/table/${order.table.number}`}
-        className="mt-6 block rounded-lg border border-orange-600 py-2 text-center font-semibold text-orange-600"
-      >
-        <YourOrders minOrders={2} />
-        Order more
-      </Link>
+      <YourOrders minOrders={2} />
+<Link
+  to="/"
+  className="mt-6 block rounded-lg border border-orange-600 py-2 text-center font-semibold text-orange-600"
+>
+  Order more
+</Link>
     </div>
   );
 }
