@@ -3,6 +3,7 @@ const orderService = require("../services/order.service");
 const { getIO } = require("../sockets");
 
 const createOrderSchema = z.object({
+  // Hidden: every order uses the single "cart" table, so the client no longer sends it
   tableNumber: z.number().int().positive().default(1),
   customerName: z
     .string()
@@ -36,8 +37,13 @@ exports.createOrder = async (req, res, next) => {
   try {
     const data = createOrderSchema.parse(req.body);
     const order = await orderService.createOrder(data);
-    // The kitchen hears about an order only after it is paid. Counter orders go to the cashier first.
-    if (order.paymentMethod === "COUNTER") getIO().to("cashier").emit("order:pending", order);
+    // Pay-after orders reach the kitchen AND the cashier at the same moment.
+    // Online orders are announced after the payment is verified.
+    if (order.paymentMethod === "COUNTER") {
+      const io = getIO();
+      io.to("kitchen").emit("order:new", order);
+      io.to("cashier").emit("order:pending", order);
+    }
     res.status(201).json(order);
   } catch (err) {
     next(err);
@@ -49,7 +55,7 @@ exports.updateStatus = async (req, res, next) => {
     const id = idSchema.parse(req.params.id);
     const { status } = statusSchema.parse(req.body);
     const order = await orderService.updateStatus(id, status);
-    getIO().to("kitchen").to(`order:${order.publicToken}`).emit("order:updated", order);
+    getIO().to("kitchen").to("cashier").to(`order:${order.publicToken}`).emit("order:updated", order);
     res.json(order);
   } catch (err) {
     next(err);
@@ -96,9 +102,8 @@ exports.confirmPayment = async (req, res, next) => {
   try {
     const id = idSchema.parse(req.params.id);
     const order = await orderService.confirmCounterPayment(id);
-    const io = getIO();
-    io.to("kitchen").emit("order:new", order); // now the kitchen sees it
-    io.to("cashier").to(`order:${order.publicToken}`).emit("order:updated", order);
+    // Cashier screen (drops it), kitchen (UNPAID badge goes away) and the customer's phone (Paid ✓)
+    getIO().to("cashier").to("kitchen").to(`order:${order.publicToken}`).emit("order:updated", order);
     res.json(order);
   } catch (err) {
     next(err);
@@ -109,7 +114,7 @@ exports.rejectOrder = async (req, res, next) => {
   try {
     const id = idSchema.parse(req.params.id);
     const order = await orderService.rejectUnpaid(id);
-    getIO().to("cashier").to(`order:${order.publicToken}`).emit("order:updated", order);
+    getIO().to("cashier").to("kitchen").to(`order:${order.publicToken}`).emit("order:updated", order);
     res.json(order);
   } catch (err) {
     next(err);

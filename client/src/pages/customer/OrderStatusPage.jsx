@@ -4,7 +4,6 @@ import { trackOrder } from "../../api/http";
 import { socket } from "../../api/socket";
 import { PAYMENT_CANCELLED, payForOrder } from "../../utils/payment";
 import { rupees } from "../../utils/money";
-import { UNPAID_EXPIRY_MINUTES } from "../../utils/constants";
 import ReadyBanner from "../../components/ReadyBanner";
 import YourOrders from "../../components/YourOrders";
 import { useMyOrders } from "../../context/MyOrdersContext";
@@ -26,7 +25,7 @@ export default function OrderStatusPage() {
   const [payError, setPayError] = useState("");
 
   useEffect(() => {
-      const load = () =>
+    const load = () =>
       trackOrder(token)
         .then((o) => {
           setOrder(o);
@@ -69,8 +68,12 @@ export default function OrderStatusPage() {
   if (!order) return <p className="p-4">Loading...</p>;
 
   const cancelled = order.status === "CANCELLED";
-  const awaitingPayment = order.status === "PENDING_PAYMENT";
+  const awaitingOnlinePayment = order.status === "PENDING_PAYMENT";
   const currentStep = STEPS.indexOf(order.status);
+  const counterUnpaid =
+    !cancelled && order.paymentMethod === "COUNTER" && order.paymentStatus === "PENDING";
+  const counterPaid =
+    !cancelled && order.paymentMethod === "COUNTER" && order.paymentStatus === "PAID";
 
   let paymentLine;
   if (order.paymentStatus === "PAID") {
@@ -78,7 +81,7 @@ export default function OrderStatusPage() {
   } else if (order.paymentMethod === "ONLINE") {
     paymentLine = "Online payment pending";
   } else {
-    paymentLine = "Pay at the counter";
+    paymentLine = "Not paid yet";
   }
 
   return (
@@ -89,23 +92,25 @@ export default function OrderStatusPage() {
       <h1 className="text-xl font-bold">Order #{order.id}</h1>
       <p className="text-sm text-gray-500">For {order.customerName}</p>
 
+      {counterUnpaid && (
+        <div className="mt-4 rounded-lg bg-amber-50 p-3 text-center">
+          <p className="text-sm text-amber-800">
+            Please pay at the counter. Tell the cashier your name or order number.
+          </p>
+          <p className="mt-1 text-2xl font-extrabold text-amber-900">{rupees(order.totalPaise)}</p>
+        </div>
+      )}
+      {counterPaid && (
+        <div className="mt-4 rounded-lg bg-green-50 p-3 text-center font-semibold text-green-700">
+          Payment received ✓ Thank you!
+        </div>
+      )}
+
       {cancelled ? (
         <p className="mt-4 rounded-lg bg-red-50 p-3 font-semibold text-red-700">
-          This order was cancelled. If it was not paid in time, please place a new order, or speak to the staff.
+          This order was cancelled. Please place a new order, or speak to the staff.
         </p>
-      ) : awaitingPayment && order.paymentMethod === "COUNTER" ? (
-        <div className="mt-4 rounded-lg bg-amber-50 p-4 text-center">
-          <p className="text-sm text-amber-800">
-            Please pay at the counter and tell the cashier your order number
-          </p>
-          <p className="my-2 text-4xl font-extrabold text-amber-900">#{order.id}</p>
-          <p className="text-lg font-semibold">{rupees(order.totalPaise)}</p>
-          <p className="mt-2 text-sm text-amber-700">
-            Your order goes to the kitchen once the cashier confirms your payment. Unpaid orders are
-            cancelled after {UNPAID_EXPIRY_MINUTES} minutes.
-          </p>
-        </div>
-      ) : awaitingPayment ? (
+      ) : awaitingOnlinePayment ? (
         <div className="mt-4 rounded-lg bg-amber-50 p-3">
           <p className="font-semibold text-amber-800">Payment pending</p>
           <p className="text-sm text-amber-700">
@@ -157,12 +162,12 @@ export default function OrderStatusPage() {
       </div>
 
       <YourOrders minOrders={2} />
-<Link
-  to="/"
-  className="mt-6 block rounded-lg border border-orange-600 py-2 text-center font-semibold text-orange-600"
->
-  Order more
-</Link>
+      <Link
+        to="/"
+        className="mt-6 block rounded-lg border border-orange-600 py-2 text-center font-semibold text-orange-600"
+      >
+        Order more
+      </Link>
     </div>
   );
 }

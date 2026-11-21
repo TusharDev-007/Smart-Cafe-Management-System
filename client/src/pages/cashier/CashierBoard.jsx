@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { confirmCounterPayment, getPendingPayments, rejectOrder } from "../../api/http";
 import { socket } from "../../api/socket";
 import { useAuth } from "../../context/AuthContext";
-import { UNPAID_EXPIRY_MINUTES } from "../../utils/constants";
 import { rupees } from "../../utils/money";
 
 const minutesSince = (iso, now) =>
@@ -11,6 +10,18 @@ const minutesSince = (iso, now) =>
 
 // Same person = same name, ignoring capitals and extra spaces
 const nameKey = (o) => (o.customerName || "").trim().toLowerCase();
+
+// What the kitchen is doing with the order, so the cashier knows if the food is already out
+const KITCHEN_LABEL = {
+  NEW: { text: "Waiting for kitchen", tone: "bg-blue-100 text-blue-800" },
+  PREPARING: { text: "Being prepared", tone: "bg-amber-100 text-amber-800" },
+  READY: { text: "Ready", tone: "bg-green-100 text-green-800" },
+  SERVED: { text: "Served", tone: "bg-gray-200 text-gray-700" },
+};
+
+// An order stays on this screen only while it is a pay-at-counter order that is still unpaid
+const isWaitingForMoney = (o) =>
+  o.paymentMethod === "COUNTER" && o.paymentStatus === "PENDING" && o.status !== "CANCELLED";
 
 export default function CashierBoard() {
   const { user, logout } = useAuth();
@@ -28,10 +39,10 @@ export default function CashierBoard() {
     [logout]
   );
 
-  // Keep an order only while it is still waiting for payment
+  // Insert or update an order; paid or cancelled orders leave the screen
   const upsert = useCallback((order) => {
     setOrders((prev) => {
-      if (order.status !== "PENDING_PAYMENT") return prev.filter((o) => o.id !== order.id);
+      if (!isWaitingForMoney(order)) return prev.filter((o) => o.id !== order.id);
       return prev.some((o) => o.id === order.id)
         ? prev.map((o) => (o.id === order.id ? order : o))
         : [...prev, order];
@@ -110,7 +121,11 @@ export default function CashierBoard() {
   }
 
   async function reject(order) {
-    if (!window.confirm(`Reject order #${order.id} from ${order.customerName}?`)) return;
+    const extra =
+      order.status === "SERVED" || order.status === "READY" || order.status === "PREPARING"
+        ? "\n\nThe kitchen has already started on it. It will be cancelled everywhere."
+        : "";
+    if (!window.confirm(`Cancel order #${order.id} from ${order.customerName}?${extra}`)) return;
     setBusy(true);
     setError("");
     try {
@@ -123,7 +138,7 @@ export default function CashierBoard() {
     }
   }
 
-  // Group the waiting orders by customer name, oldest first
+  // Group the unpaid orders by customer name, oldest first
   const groups = Object.values(
     orders.reduce((acc, o) => {
       (acc[nameKey(o)] ||= []).push(o);
@@ -155,13 +170,13 @@ export default function CashierBoard() {
 
       <main className="mx-auto max-w-3xl space-y-4 p-4">
         <p className="text-sm text-gray-600">
-          Orders waiting for payment. Confirm only after you have received the money. Unpaid orders are
-          cancelled after {UNPAID_EXPIRY_MINUTES} minutes.
+          Orders that are not paid yet. Confirm only after you have received the money; the order
+          then disappears from this list.
         </p>
 
         {groups.length === 0 && (
           <p className="rounded-lg bg-white p-6 text-center text-gray-500 shadow">
-            No orders waiting for payment.
+            No unpaid orders. Everyone has paid.
           </p>
         )}
 
@@ -191,22 +206,24 @@ export default function CashierBoard() {
               <div className="space-y-3">
                 {group.map((o) => {
                   const mins = minutesSince(o.createdAt, now);
+                  const k = KITCHEN_LABEL[o.status];
                   return (
                     <div key={o.id} className="rounded-lg border p-3">
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="text-2xl font-extrabold">#{o.id}</span>
-                        {o.isPacking && (
-                          <span className="ml-2 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-bold text-orange-700">
-                            🛍️ Packing
-                          </span>
-                        )}
-                        <span
-                          className={`text-sm ${
-                            mins >= UNPAID_EXPIRY_MINUTES - 5 ? "font-bold text-red-600" : "text-gray-500"
-                          }`}
-                        >
-                          {mins} min ago
+                        <span className="flex items-center gap-2">
+                          {o.isPacking && (
+                            <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-bold text-orange-700">
+                              🛍️ Packing
+                            </span>
+                          )}
+                          {k && (
+                            <span className={`rounded px-2 py-0.5 text-xs font-semibold ${k.tone}`}>
+                              {k.text}
+                            </span>
+                          )}
                         </span>
+                        <span className="text-sm text-gray-500">{mins} min ago</span>
                       </div>
                       <ul className="mt-2 text-sm">
                         {o.items.map((i) => (
@@ -229,7 +246,7 @@ export default function CashierBoard() {
                           onClick={() => reject(o)}
                           className="rounded-lg border border-red-500 px-3 py-2 text-red-600 disabled:opacity-60"
                         >
-                          Reject
+                          Cancel
                         </button>
                       </div>
                     </div>

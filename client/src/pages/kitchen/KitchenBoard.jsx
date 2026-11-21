@@ -199,9 +199,15 @@ const openByName = orders.reduce((acc, o) => {
                         ))}
                       </ul>
                       <p className="mt-2 flex flex-wrap gap-1">
-                        <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs font-semibold text-green-800">
-                          {o.paymentMethod === "ONLINE" ? "PAID ONLINE" : "PAID AT COUNTER"}
-                        </span>
+                                                {o.paymentStatus === "PAID" ? (
+                          <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs font-semibold text-green-800">
+                            {o.paymentMethod === "ONLINE" ? "PAID ONLINE" : "PAID AT COUNTER"}
+                          </span>
+                        ) : (
+                          <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-bold text-red-700">
+                            UNPAID
+                          </span>
+                        )}
                         {openByName[nameKey(o)] > 1 && (
   <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">
     {o.customerName} · {openByName[nameKey(o)]} open orders

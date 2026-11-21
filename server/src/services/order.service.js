@@ -2,8 +2,8 @@ const prisma = require("../lib/prisma");
 const AppError = require("../utils/AppError");
 const payments = require("./payment.service");
 
-// Status changes the kitchen may make. Unpaid orders are not theirs to move:
-// only a verified online payment or the cashier can release them.
+// Status changes the kitchen may make. Online orders that are still unpaid are not theirs to
+// move: only a verified online payment can release them.
 const ALLOWED = {
   PENDING_PAYMENT: [],
   NEW: ["PREPARING", "CANCELLED"],
@@ -13,10 +13,8 @@ const ALLOWED = {
   CANCELLED: [],
 };
 
-const UNPAID_EXPIRY_MINUTES = 15; // keep in sync with client/src/utils/constants.js
-const UNPAID_EXPIRY_MS = UNPAID_EXPIRY_MINUTES * 60 * 1000;
 const MAX_ORDER_PAISE = 500000; // Rs 5,000
-const MAX_UNPAID_PER_CUSTOMER = 3;
+const MAX_UNPAID_PER_CUSTOMER = 5;
 
 const orderInclude = { table: true, items: true };
 
@@ -55,20 +53,21 @@ async function createOrder({ tableNumber = 1, customerName, items, notes, paymen
     );
   }
 
-  // Stop one table from flooding the cashier with unpaid orders
-    // Stop one person from flooding the cashier with unpaid orders (double taps, repeats)
-  const waiting = await prisma.order.count({
+  // Stop one person from piling up unpaid orders (double taps, repeats)
+  const unpaid = await prisma.order.count({
     where: {
       customerName,
-      status: "PENDING_PAYMENT",
-      createdAt: { gte: new Date(Date.now() - UNPAID_EXPIRY_MS) },
+      paymentMethod: "COUNTER",
+      paymentStatus: "PENDING",
+      status: { not: "CANCELLED" },
     },
   });
-  if (waiting >= MAX_UNPAID_PER_CUSTOMER) {
-    throw new AppError(429, "You already have orders waiting for payment. Please pay for them first.");
+  if (unpaid >= MAX_UNPAID_PER_CUSTOMER) {
+    throw new AppError(429, "You still have orders that are not paid. Please pay at the counter first.");
   }
 
-  // Every order starts unpaid: online orders wait for Razorpay, counter orders wait for the cashier
+  // Pay-after orders go straight to the kitchen (status NEW, payment PENDING) and are also listed
+  // on the cashier screen until the cashier confirms the money. Online orders wait for Razorpay.
   return prisma.order.create({
     data: {
       tableId: table.id,
@@ -77,7 +76,7 @@ async function createOrder({ tableNumber = 1, customerName, items, notes, paymen
       notes,
       isPacking: Boolean(isPacking),
       paymentMethod,
-      status: "PENDING_PAYMENT",
+      status: paymentMethod === "COUNTER" ? "NEW" : "PENDING_PAYMENT",
       items: { create: orderItems },
     },
     include: orderInclude,
@@ -122,70 +121,53 @@ async function getByToken(token) {
 
 // ---- Cashier ----
 
-// Counter orders still waiting for the customer to pay
+// Pay-at-counter orders whose money has not been received yet, whatever the kitchen has done
+// with them. They stay here until the cashier confirms payment (there is no automatic expiry).
 function listPendingCounter() {
   return prisma.order.findMany({
     where: {
-      status: "PENDING_PAYMENT",
       paymentMethod: "COUNTER",
-      createdAt: { gte: new Date(Date.now() - UNPAID_EXPIRY_MS) },
+      paymentStatus: "PENDING",
+      status: { not: "CANCELLED" },
     },
     include: orderInclude,
     orderBy: { createdAt: "asc" },
   });
 }
 
-// The cashier has received the money: release this order to the kitchen
+// The cashier has received the money: mark the order paid. The kitchen's work is not affected.
 async function confirmCounterPayment(id) {
   const order = await prisma.order.findUnique({ where: { id } });
   if (!order) throw new AppError(404, "Order not found");
   if (order.paymentMethod !== "COUNTER") throw new AppError(409, "This order is paid online");
-  if (order.status === "CANCELLED") {
-    throw new AppError(409, "This order was cancelled or expired. Ask the customer to order again.");
-  }
+  if (order.status === "CANCELLED") throw new AppError(409, "This order was cancelled.");
 
-  // Atomic: guards against two cashiers (or the expiry job) acting at the same moment
+  // Atomic: guards against two cashiers acting at the same moment
   const { count } = await prisma.order.updateMany({
-    where: { id, status: "PENDING_PAYMENT", paymentMethod: "COUNTER" },
-    data: { status: "NEW", paymentStatus: "PAID" },
+    where: { id, paymentMethod: "COUNTER", paymentStatus: "PENDING", status: { not: "CANCELLED" } },
+    data: { paymentStatus: "PAID" },
   });
-  if (count === 0) throw new AppError(409, "This order was already confirmed");
+  if (count === 0) throw new AppError(409, "This order was already marked as paid");
   return getById(id);
 }
 
-// Fake or abandoned order: cancel it before any food is made
+// Fake or abandoned order: cancel it
 async function rejectUnpaid(id) {
   const order = await prisma.order.findUnique({ where: { id } });
   if (!order) throw new AppError(404, "Order not found");
 
   const { count } = await prisma.order.updateMany({
-    where: { id, status: "PENDING_PAYMENT", paymentMethod: "COUNTER" },
+    where: { id, paymentMethod: "COUNTER", paymentStatus: "PENDING", status: { not: "CANCELLED" } },
     data: { status: "CANCELLED" },
   });
   if (count === 0) throw new AppError(409, "This order is no longer waiting for payment");
   return getById(id);
 }
 
-// Cancels counter orders that were not paid in time. Returns the orders it cancelled.
+// Pay-after orders no longer expire. Kept as a no-op so the existing background job
+// that calls it keeps working.
 async function expireUnpaidCounterOrders() {
-  const stale = await prisma.order.findMany({
-    where: {
-      status: "PENDING_PAYMENT",
-      paymentMethod: "COUNTER",
-      createdAt: { lt: new Date(Date.now() - UNPAID_EXPIRY_MS) },
-    },
-    select: { id: true },
-  });
-
-  const expired = [];
-  for (const { id } of stale) {
-    const { count } = await prisma.order.updateMany({
-      where: { id, status: "PENDING_PAYMENT" },
-      data: { status: "CANCELLED" },
-    });
-    if (count === 1) expired.push(await getById(id));
-  }
-  return expired;
+  return [];
 }
 
 module.exports = {

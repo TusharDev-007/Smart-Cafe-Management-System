@@ -27,8 +27,10 @@ export default function YourOrders({ minOrders = 1 }) {
   const orders = forTable(tableNumber);
   if (orders.length < minOrders) return null;
 
-  // Counter orders the customer still has to pay for, as one combined amount
-  const toPay = orders.filter((o) => o.status === "PENDING_PAYMENT" && o.paymentMethod === "COUNTER");
+  // Pay-at-counter orders the customer still has to pay for, as one combined amount
+  const toPay = orders.filter(
+    (o) => o.paymentMethod === "COUNTER" && o.paymentStatus === "PENDING" && o.status !== "CANCELLED"
+  );
   const toPayTotal = toPay.reduce((sum, o) => sum + o.totalPaise, 0);
 
   return (
